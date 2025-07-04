@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/opencode-ai/opencode/internal/config"
 	"github.com/opencode-ai/opencode/internal/db"
 	"github.com/opencode-ai/opencode/internal/format"
@@ -96,8 +97,16 @@ func (app *App) initTheme() {
 	}
 }
 
+// validateSessionID validates that the provided session ID is a valid UUID
+func validateSessionID(sessionID string) error {
+	if _, err := uuid.Parse(sessionID); err != nil {
+		return fmt.Errorf("session ID must be a valid UUID: %w", err)
+	}
+	return nil
+}
+
 // RunNonInteractive handles the execution flow when a prompt is provided via CLI flag.
-func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat string, quiet bool) error {
+func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat string, quiet bool, sessionID string) error {
 	logging.Info("Running in non-interactive mode")
 
 	// Start spinner if not in quiet mode
@@ -108,22 +117,45 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 		defer spinner.Stop()
 	}
 
-	const maxPromptLengthForTitle = 100
-	titlePrefix := "Non-interactive: "
-	var titleSuffix string
+	var sess session.Session
+	var err error
 
-	if len(prompt) > maxPromptLengthForTitle {
-		titleSuffix = prompt[:maxPromptLengthForTitle] + "..."
+	if sessionID != "" {
+		// Validate session ID format (UUID)
+		if err := validateSessionID(sessionID); err != nil {
+			return fmt.Errorf("invalid session ID format: %w", err)
+		}
+
+		// Try to load existing session
+		sess, err = a.Sessions.Get(ctx, sessionID)
+		if err != nil {
+			// Check if error is "not found" vs other errors
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("session not found: %s", sessionID)
+			}
+			return fmt.Errorf("failed to load session %s: %w", sessionID, err)
+		}
+
+		logging.Info("Continuing existing session", "session_id", sess.ID, "title", sess.Title)
 	} else {
-		titleSuffix = prompt
-	}
-	title := titlePrefix + titleSuffix
+		// Create new session (existing behavior)
+		const maxPromptLengthForTitle = 100
+		titlePrefix := "Non-interactive: "
+		var titleSuffix string
 
-	sess, err := a.Sessions.Create(ctx, title)
-	if err != nil {
-		return fmt.Errorf("failed to create session for non-interactive mode: %w", err)
+		if len(prompt) > maxPromptLengthForTitle {
+			titleSuffix = prompt[:maxPromptLengthForTitle] + "..."
+		} else {
+			titleSuffix = prompt
+		}
+		title := titlePrefix + titleSuffix
+
+		sess, err = a.Sessions.Create(ctx, title)
+		if err != nil {
+			return fmt.Errorf("failed to create session for non-interactive mode: %w", err)
+		}
+		logging.Info("Created new session", "session_id", sess.ID)
 	}
-	logging.Info("Created session for non-interactive run", "session_id", sess.ID)
 
 	// Automatically approve all permission requests for this non-interactive session
 	a.Permissions.AutoApproveSession(sess.ID)
@@ -153,7 +185,7 @@ func (a *App) RunNonInteractive(ctx context.Context, prompt string, outputFormat
 		content = result.Message.Content().String()
 	}
 
-	fmt.Println(format.FormatOutput(content, outputFormat))
+	fmt.Println(format.FormatOutput(content, sess.ID, outputFormat))
 
 	logging.Info("Non-interactive run completed", "session_id", sess.ID)
 

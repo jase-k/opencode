@@ -45,6 +45,9 @@ to assist developers in writing, debugging, and understanding code directly from
 
   # Run a single non-interactive prompt with JSON output format
   opencode -p "Explain the use of context in Go" -f json
+
+  # Continue a conversation from an existing session
+  opencode -p "How are you?" -s abc123-def4-5678-9012-345678901234 -f json
   `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// If the help flag is set, show the help message
@@ -63,6 +66,7 @@ to assist developers in writing, debugging, and understanding code directly from
 		prompt, _ := cmd.Flags().GetString("prompt")
 		outputFormat, _ := cmd.Flags().GetString("output-format")
 		quiet, _ := cmd.Flags().GetBool("quiet")
+		sessionID, _ := cmd.Flags().GetString("session-id")
 
 		// Validate format option
 		if !format.IsValid(outputFormat) {
@@ -111,7 +115,7 @@ to assist developers in writing, debugging, and understanding code directly from
 		// Non-interactive mode
 		if prompt != "" {
 			// Run non-interactive flow using the App method
-			return app.RunNonInteractive(ctx, prompt, outputFormat, quiet)
+			return app.RunNonInteractive(ctx, prompt, outputFormat, quiet, sessionID)
 		}
 
 		// Interactive mode
@@ -301,6 +305,9 @@ func init() {
 
 	// Add quiet flag to hide spinner in non-interactive mode
 	rootCmd.Flags().BoolP("quiet", "q", false, "Hide spinner in non-interactive mode")
+
+	// Add session-id flag to continue conversation from existing session
+	rootCmd.Flags().StringP("session-id", "s", "", "Continue conversation from existing session")
 
 	// Register custom validation for the format flag
 	rootCmd.RegisterFlagCompletionFunc("output-format", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
