@@ -294,6 +294,9 @@ opencode -p "Explain the use of context in Go"
 # Get response in JSON format
 opencode -p "Explain the use of context in Go" -f json
 
+# Get response in JSON format with session
+opencode -p "Summarize our conversation so far" -f json -s "0000-0000-00000"
+
 # Run without showing the spinner (useful for scripts)
 opencode -p "Explain the use of context in Go" -q
 ```
@@ -311,7 +314,7 @@ OpenCode supports the following output formats in non-interactive mode:
 | `text` | Plain text output (default)     |
 | `json` | Output wrapped in a JSON object |
 
-The output format is implemented as a strongly-typed `OutputFormat` in the codebase, ensuring type safety and validation when processing outputs.
+The output format is implemented as a strongly-typed `OutputFormat` in the codebase, ensuring type safety and validation when processing outputs. Json output will also output the session_id. 
 
 ## Command-line Flags
 
@@ -323,6 +326,7 @@ The output format is implemented as a strongly-typed `OutputFormat` in the codeb
 | `--prompt`        | `-p`  | Run a single prompt in non-interactive mode         |
 | `--output-format` | `-f`  | Output format for non-interactive mode (text, json) |
 | `--quiet`         | `-q`  | Hide spinner in non-interactive mode                |
+| `--session`       | `-s`  | Continue from a previous session                    |
 
 ## Keyboard Shortcuts
 
